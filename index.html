@@ -37,8 +37,7 @@
       --transition-normal: all 0.3s ease;
       --transition-slow: all 0.6s ease;
     }
-    
-    /* Reset e estilos base */
+
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -122,7 +121,6 @@
       animation-duration: 12s;
     }
     
-    /* Header */
     .header {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -179,7 +177,6 @@
       color: #fff;
     }
     
-    /* Sidebar */
     .sidebar {
       position: fixed;
       left: -300px;
@@ -710,7 +707,6 @@
       }
     }
     
-    /* Modo de desempenho */
     .performance-mode {
       background: var(--bg-primary) !important;
       animation: none !important;
@@ -759,7 +755,6 @@
     </div>
   </div>
 
-  <!-- Header -->
   <header class="header">
     <div class="logo">
       <button id="menuToggle" class="icon-btn">
@@ -777,7 +772,6 @@
     </div>
   </header>
 
-  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" id="sidebarClose">
       <i class="fas fa-times"></i>
@@ -808,7 +802,7 @@
         </div>
         
         <div id="walletDisplay">
-          <!-- Conteúdo da carteira será injetado aqui pelo JavaScript -->
+      
         </div>
         
         <div class="wallet-actions">
@@ -1058,7 +1052,6 @@
     let miningTimerId = null;
     let miningCount = 0;
     
-    // Funções utilitárias
     function setCookie(name, value, days) {
       let expires = "";
       if (days) {
@@ -1314,7 +1307,7 @@
       // Marcar o link correspondente como ativo
       document.querySelector(`.nav-list a[data-page="${pageId}"]`)?.classList.add("active");
       
-      // Fechar o sidebar em dispositivos móveis
+      // Fechar o sidebar em celular
       if(window.innerWidth <= 768) {
         document.getElementById("sidebar").classList.remove("active");
       }
