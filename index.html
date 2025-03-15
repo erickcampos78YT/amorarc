@@ -1298,7 +1298,26 @@
     }
   </style>
   
-  <!-- Importando a API do Amoracoin -->
+  <!-- Scripts do Firebase (mantendo a versão compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Atualização da configuração do Firebase com suas novas credenciais
+    const firebaseConfig = {
+      apiKey: "AIzaSyCJHPESZ4idP_KCW4bEZIHT6jYI1T9DNSo",
+      authDomain: "amorarc-chat.firebaseapp.com",
+      databaseURL: "https://amorarc-chat-default-rtdb.firebaseio.com",
+      projectId: "amorarc-chat",
+      storageBucket: "amorarc-chat.firebasestorage.app",
+      messagingSenderId: "37874556391",
+      appId: "1:37874556391:web:1dd04fb6f7901909e57142"
+    };
+    
+    // Inicializar Firebase
+    firebase.initializeApp(firebaseConfig);
+  </script>
   <script src="https://amoracoin.vercel.app/Src/Amoracoin%20lib/1.0.js"></script>
   <script>
     // Variáveis globais
@@ -1996,34 +2015,24 @@
         sendChatMessage();
       });
       
-      // Verificar se há um login salvo
-      const savedChatUsername = localStorage.getItem("amorarc_chat_username");
-      const savedChatToken = localStorage.getItem("amorarc_chat_token");
-      
-      if (savedChatUsername && savedChatToken) {
-        // Auto login
-        document.getElementById("chatUsername").value = savedChatUsername;
-        chatAutoLogin(savedChatUsername, savedChatToken);
-      }
-    }
-    
-    function encryptData(data, key) {
-      // Simulação de criptografia simples (em produção usaria uma biblioteca mais robusta)
-      // Esta é apenas uma representação básica
-      return btoa(JSON.stringify(data) + "|" + key);
-    }
-    
-    function decryptData(encryptedData, key) {
-      // Simulação de descriptografia
-      try {
-        const decoded = atob(encryptedData);
-        if (decoded.includes("|" + key)) {
-          return JSON.parse(decoded.split("|" + key)[0]);
+      // Verificar se há um usuário autenticado
+      firebase.auth().onAuthStateChanged(function(user) {
+        console.log("Estado de autenticação mudou:", user ? "Usuário logado" : "Usuário não logado");
+        if (user) {
+          // Usuário está logado
+          chatCurrentUser = user.displayName || user.email;
+          document.getElementById("chatCurrentUser").textContent = chatCurrentUser;
+          document.getElementById("chatLogin").style.display = "none";
+          document.getElementById("chatInterface").style.display = "block";
+          
+          // Conectar ao chat
+          connectToChat();
+        } else {
+          // Usuário não está logado
+          document.getElementById("chatLogin").style.display = "block";
+          document.getElementById("chatInterface").style.display = "none";
         }
-        return null;
-      } catch (e) {
-        return null;
-      }
+      });
     }
     
     function chatRegister() {
@@ -2045,47 +2054,34 @@
         return;
       }
       
-      // Simular conexão com um servidor
-      setTimeout(() => {
-        // Verificar se o nome de usuário já existe
-        const usersData = localStorage.getItem("amorarc_chat_users") || "{}";
-        const users = JSON.parse(usersData);
-        
-        if (users[username]) {
-          showNotification("Nome de usuário já existe", "error");
-          return;
-        }
-        
-        // Criar um token único para o usuário
-        const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-        
-        // Criptografar a senha
-        const encryptedPassword = encryptData(password, username);
-        
-        // Salvar o novo usuário
-        users[username] = {
-          passwordHash: encryptedPassword,
-          createdAt: Date.now(),
-          lastSeen: Date.now()
-        };
-        
-        localStorage.setItem("amorarc_chat_users", JSON.stringify(users));
-        
-        // Salvar o token de sessão
-        localStorage.setItem("amorarc_chat_username", username);
-        localStorage.setItem("amorarc_chat_token", token);
-        
-        showNotification("Registro concluído com sucesso!", "success");
-        
-        // Iniciar o chat
-        chatCurrentUser = username;
-        document.getElementById("chatCurrentUser").textContent = username;
-        document.getElementById("chatLogin").style.display = "none";
-        document.getElementById("chatInterface").style.display = "block";
-        
-        // Conectar ao chat
-        connectToChat();
-      }, 1000);
+      // Criar usuário no Firebase Auth
+      console.log("Tentando registrar usuário:", username);
+      firebase.auth().createUserWithEmailAndPassword(username + "@amorarc.app", password)
+        .then((userCredential) => {
+          console.log("Usuário registrado com sucesso:", userCredential.user.uid);
+          // Definir nome de exibição
+          return userCredential.user.updateProfile({
+            displayName: username
+          });
+        })
+        .then(() => {
+          // Salvar dados adicionais do usuário
+          const user = firebase.auth().currentUser;
+          const userId = user.uid;
+          
+          return firebase.database().ref('users/' + userId).set({
+            username: username,
+            createdAt: Date.now(),
+            lastSeen: Date.now()
+          });
+        })
+        .then(() => {
+          showNotification("Registro concluído com sucesso!", "success");
+        })
+        .catch((error) => {
+          console.error("Erro detalhado no registro:", error.code, error.message);
+          showNotification("Erro ao registrar: " + error.message, "error");
+        });
     }
     
     function chatLogin() {
@@ -2097,158 +2093,135 @@
         return;
       }
       
-      // Simular conexão com um servidor
-      setTimeout(() => {
-        // Verificar credenciais
-        const usersData = localStorage.getItem("amorarc_chat_users") || "{}";
-        const users = JSON.parse(usersData);
-        
-        if (!users[username]) {
-          showNotification("Usuário não encontrado", "error");
-          return;
-        }
-        
-        // Verificar senha
-        const savedPasswordHash = users[username].passwordHash;
-        const decryptedPassword = decryptData(savedPasswordHash, username);
-        
-        if (decryptedPassword !== password) {
-          showNotification("Senha incorreta", "error");
-          return;
-        }
-        
-        // Criar um token único para a sessão
-        const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
-        
-        // Atualizar último acesso
-        users[username].lastSeen = Date.now();
-        localStorage.setItem("amorarc_chat_users", JSON.stringify(users));
-        
-        // Salvar o token de sessão
-        localStorage.setItem("amorarc_chat_username", username);
-        localStorage.setItem("amorarc_chat_token", token);
-        
-        showNotification("Login realizado com sucesso!", "success");
-        
-        // Iniciar o chat
-        chatCurrentUser = username;
-        document.getElementById("chatCurrentUser").textContent = username;
-        document.getElementById("chatLogin").style.display = "none";
-        document.getElementById("chatInterface").style.display = "block";
-        
-        // Conectar ao chat
-        connectToChat();
-      }, 1000);
-    }
-    
-    function chatAutoLogin(username, token) {
-      // Simulação de verificação de token
-      setTimeout(() => {
-        const usersData = localStorage.getItem("amorarc_chat_users") || "{}";
-        const users = JSON.parse(usersData);
-        
-        if (!users[username]) {
-          // Token inválido ou usuário não existe mais
-          localStorage.removeItem("amorarc_chat_username");
-          localStorage.removeItem("amorarc_chat_token");
-          return;
-        }
-        
-        // Atualizar último acesso
-        users[username].lastSeen = Date.now();
-        localStorage.setItem("amorarc_chat_users", JSON.stringify(users));
-        
-        chatCurrentUser = username;
-        document.getElementById("chatCurrentUser").textContent = username;
-        document.getElementById("chatLogin").style.display = "none";
-        document.getElementById("chatInterface").style.display = "block";
-        
-        // Conectar ao chat
-        connectToChat();
-      }, 500);
+      // Login no Firebase Auth
+      firebase.auth().signInWithEmailAndPassword(username + "@amorarc.app", password)
+        .then((userCredential) => {
+          // Atualizar último acesso
+          const userId = userCredential.user.uid;
+          return firebase.database().ref('users/' + userId).update({
+            lastSeen: Date.now()
+          });
+        })
+        .then(() => {
+          showNotification("Login realizado com sucesso!", "success");
+        })
+        .catch((error) => {
+          console.error("Erro no login:", error);
+          showNotification("Erro ao fazer login: " + error.message, "error");
+        });
     }
     
     function chatLogout() {
       // Desconectar do chat
       disconnectFromChat();
       
-      // Limpar dados da sessão
-      localStorage.removeItem("amorarc_chat_username");
-      localStorage.removeItem("amorarc_chat_token");
-      
-      chatCurrentUser = null;
-      document.getElementById("chatLogin").style.display = "block";
-      document.getElementById("chatInterface").style.display = "none";
-      document.getElementById("chatMessages").innerHTML = `
-        <div class="chat-welcome">
-          <p>Bem-vindo ao Chat Global do AmoraRC!</p>
-          <p>Este é um espaço para interagir com outros usuários da plataforma.</p>
-        </div>
-      `;
-      
-      showNotification("Você saiu do chat", "info");
+      // Logout do Firebase
+      firebase.auth().signOut()
+        .then(() => {
+          chatCurrentUser = null;
+          document.getElementById("chatLogin").style.display = "block";
+          document.getElementById("chatInterface").style.display = "none";
+          document.getElementById("chatMessages").innerHTML = `
+            <div class="chat-welcome">
+              <p>Bem-vindo ao Chat Global do AmoraRC!</p>
+              <p>Este é um espaço para interagir com outros usuários da plataforma.</p>
+            </div>
+          `;
+          
+          showNotification("Você saiu do chat", "info");
+        })
+        .catch((error) => {
+          console.error("Erro ao fazer logout:", error);
+        });
     }
     
     function connectToChat() {
-      // Simular conexão WebSocket
-      if (chatSocket) {
-        disconnectFromChat();
-      }
+      // Referência para o nó de presença
+      const userId = firebase.auth().currentUser.uid;
+      const userStatusRef = firebase.database().ref('users/' + userId);
       
-      // Adicionar mensagem de sistema
-      addSystemMessage(`${chatCurrentUser} entrou no chat`);
+      // Atualizar status online
+      userStatusRef.update({
+        lastSeen: Date.now(),
+        online: true
+      });
       
-      // Atualizar lista de usuários
-      updateOnlineUsers();
+      // Configurar para atualizar status quando desconectar
+      userStatusRef.onDisconnect().update({
+        online: false,
+        lastSeen: firebase.database.ServerValue.TIMESTAMP
+      });
       
       // Carregar histórico de mensagens
       loadChatHistory();
       
-      // Simular recebimento periódico de mensagens
-      chatSocket = setInterval(() => {
-        pollForNewMessages();
-      }, 3000);
+      // Escutar por novas mensagens
+      const messagesRef = firebase.database().ref('messages');
+      messagesRef.limitToLast(1).on('child_added', (snapshot) => {
+        const message = snapshot.val();
+        
+        // Exibir apenas mensagens novas
+        if (message.timestamp > chatLastUpdateTime) {
+          displayChatMessage(message);
+          chatLastUpdateTime = message.timestamp;
+          scrollChatToBottom();
+        }
+      });
+      
+      // Escutar mudanças de usuários online
+      const usersRef = firebase.database().ref('users');
+      usersRef.on('value', (snapshot) => {
+        updateOnlineUsers(snapshot.val());
+      });
+      
+      // Adicionar mensagem de sistema
+      addSystemMessage(`${chatCurrentUser} entrou no chat`);
     }
     
     function disconnectFromChat() {
-      if (chatSocket) {
-        clearInterval(chatSocket);
-        chatSocket = null;
-      }
+      // Remover listeners
+      firebase.database().ref('messages').off();
+      firebase.database().ref('users').off();
       
-      if (chatCurrentUser) {
-        // Informar que o usuário saiu
+      if (firebase.auth().currentUser) {
+        const userId = firebase.auth().currentUser.uid;
+        // Atualizar status offline
+        firebase.database().ref('users/' + userId).update({
+          online: false,
+          lastSeen: Date.now()
+        });
+        
+        // Adicionar mensagem de sistema
         addSystemMessage(`${chatCurrentUser} saiu do chat`);
       }
     }
     
-    function updateOnlineUsers() {
-      // Simular usuários online
-      const usersData = localStorage.getItem("amorarc_chat_users") || "{}";
-      const users = JSON.parse(usersData);
+    function updateOnlineUsers(users) {
+      if (!users) return;
+      
       const usersListElement = document.getElementById("chatUsersList");
       
       // Limpar lista atual
       usersListElement.innerHTML = "";
       
-      // Lista de usuários online (que estiveram ativos nos últimos 5 minutos)
-      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+      // Lista de usuários online
+      let onlineCount = 0;
       
-      Object.keys(users).forEach(username => {
-        const isOnline = users[username].lastSeen > fiveMinutesAgo;
+      Object.keys(users).forEach(userId => {
+        const user = users[userId];
         
-        if (isOnline) {
-          chatUsers[username] = users[username];
+        if (user.online || (Date.now() - user.lastSeen < 5 * 60 * 1000)) {
+          onlineCount++;
           
           const userElement = document.createElement("div");
           userElement.className = "chat-user";
           
           // Pegar a primeira letra para o avatar
-          const firstLetter = username.charAt(0).toUpperCase();
+          const firstLetter = user.username.charAt(0).toUpperCase();
           
           userElement.innerHTML = `
             <div class="chat-user-avatar">${firstLetter}</div>
-            <div class="chat-user-name">${username}</div>
+            <div class="chat-user-name">${user.username}</div>
             <div class="chat-user-status"></div>
           `;
           
@@ -2257,90 +2230,90 @@
       });
       
       // Se não há usuários online
-      if (usersListElement.children.length === 0) {
-        usersListElement.innerHTML = "<div class='text-center' style='padding: 15px; color: var(--text-secondary);'>Nenhum usuário online</div>";
+      if (onlineCount === 0) {
+        usersListElement.innerHTML = "<div style='padding: 15px; color: var(--text-secondary);'>Nenhum usuário online</div>";
       }
     }
     
     function loadChatHistory() {
-      // Carregar histórico de mensagens do localStorage
-      const chatHistoryData = localStorage.getItem("amorarc_chat_messages") || "[]";
-      chatMessages = JSON.parse(chatHistoryData);
-      
       // Limpar mensagens atuais
       document.getElementById("chatMessages").innerHTML = "";
       
-      // Exibir as últimas 50 mensagens
-      const messagesToShow = chatMessages.slice(-50);
-      
-      if (messagesToShow.length === 0) {
-        // Se não há mensagens, mostrar mensagem de boas-vindas
-        document.getElementById("chatMessages").innerHTML = `
-          <div class="chat-welcome">
-            <p>Bem-vindo ao Chat Global do AmoraRC!</p>
-            <p>Este é um espaço para interagir com outros usuários da plataforma.</p>
-            <p>Seja o primeiro a enviar uma mensagem!</p>
-          </div>
-        `;
-        return;
-      }
-      
-      // Exibir as mensagens
-      messagesToShow.forEach(message => {
-        displayChatMessage(message);
-      });
-      
-      // Atualizar timestamp da última mensagem recebida
-      if (chatMessages.length > 0) {
-        chatLastUpdateTime = chatMessages[chatMessages.length - 1].timestamp;
-      }
-      
-      // Rolar para a última mensagem
-      scrollChatToBottom();
-    }
-    
-    function pollForNewMessages() {
-      // Em um ambiente real, faríamos uma requisição ao servidor
-      // Aqui estamos simulando uma verificação local
-      
-      // Atualizamos a lista de usuários online
-      updateOnlineUsers();
-      
-      // Em um ambiente de produção, poderíamos verificar se há novas mensagens
-      // Para esta simulação, não fazemos nada adicional aqui
+      // Carregar últimas 50 mensagens do Firebase
+      firebase.database().ref('messages')
+        .orderByChild('timestamp')
+        .limitToLast(50)
+        .once('value')
+        .then((snapshot) => {
+          const messages = snapshot.val();
+          
+          if (!messages) {
+            // Se não há mensagens, mostrar mensagem de boas-vindas
+            document.getElementById("chatMessages").innerHTML = `
+              <div class="chat-welcome">
+                <p>Bem-vindo ao Chat Global do AmoraRC!</p>
+                <p>Este é um espaço para interagir com outros usuários da plataforma.</p>
+                <p>Seja o primeiro a enviar uma mensagem!</p>
+              </div>
+            `;
+            return;
+          }
+          
+          // Exibir as mensagens
+          Object.keys(messages).forEach(key => {
+            const message = messages[key];
+            displayChatMessage(message);
+            
+            // Atualizar timestamp da última mensagem
+            if (message.timestamp > chatLastUpdateTime) {
+              chatLastUpdateTime = message.timestamp;
+            }
+          });
+          
+          // Rolar para a última mensagem
+          scrollChatToBottom();
+        })
+        .catch((error) => {
+          console.error("Erro ao carregar mensagens:", error);
+          document.getElementById("chatMessages").innerHTML = `
+            <div class="chat-welcome">
+              <p>Erro ao carregar mensagens.</p>
+              <p>${error.message}</p>
+            </div>
+          `;
+        });
     }
     
     function sendChatMessage() {
+      if (!firebase.auth().currentUser) return;
+      
       const messageInput = document.getElementById("chatMessageInput");
       const messageText = messageInput.value.trim();
       
       if (!messageText) return;
       
-      // Criar objeto de mensagem
-      const message = {
-        id: Date.now().toString(36) + Math.random().toString(36).substring(2),
+      // Criar novo registro de mensagem no Firebase
+      const messagesRef = firebase.database().ref('messages');
+      const newMessageRef = messagesRef.push();
+      
+      newMessageRef.set({
+        id: newMessageRef.key,
         sender: chatCurrentUser,
         text: messageText,
-        timestamp: Date.now()
-      };
-      
-      // Adicionar à lista de mensagens
-      chatMessages.push(message);
-      
-      // Salvar no localStorage (simulando um servidor)
-      localStorage.setItem("amorarc_chat_messages", JSON.stringify(chatMessages));
-      
-      // Exibir a mensagem na interface
-      displayChatMessage(message);
-      
-      // Limpar o input
-      messageInput.value = "";
-      
-      // Focar no input
-      messageInput.focus();
-      
-      // Rolar para a última mensagem
-      scrollChatToBottom();
+        timestamp: Date.now(),
+        uid: firebase.auth().currentUser.uid
+      })
+      .then(() => {
+        // Limpar o input
+        messageInput.value = "";
+        
+        // Focar no input
+        messageInput.focus();
+      })
+      .catch((error) => {
+        console.error("Erro ao enviar mensagem:", error);
+        showNotification("Erro ao enviar mensagem: " + error.message, "error");
+      });
     }
     
     function displayChatMessage(message) {
