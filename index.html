@@ -37,8 +37,7 @@
       --transition-normal: all 0.3s ease;
       --transition-slow: all 0.6s ease;
     }
-    
-    /* Reset e estilos base */
+
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -122,7 +121,6 @@
       animation-duration: 12s;
     }
     
-    /* Header */
     .header {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -179,7 +177,6 @@
       color: #fff;
     }
     
-    /* Sidebar */
     .sidebar {
       position: fixed;
       left: -300px;
@@ -710,7 +707,6 @@
       }
     }
     
-    /* Modo de desempenho */
     .performance-mode {
       background: var(--bg-primary) !important;
       animation: none !important;
@@ -759,7 +755,6 @@
     </div>
   </div>
 
-  <!-- Header -->
   <header class="header">
     <div class="logo">
       <button id="menuToggle" class="icon-btn">
@@ -777,7 +772,6 @@
     </div>
   </header>
 
-  <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <button class="sidebar-close" id="sidebarClose">
       <i class="fas fa-times"></i>
@@ -808,7 +802,7 @@
         </div>
         
         <div id="walletDisplay">
-          <!-- Conteúdo da carteira será injetado aqui pelo JavaScript -->
+      
         </div>
         
         <div class="wallet-actions">
@@ -1048,68 +1042,182 @@
   <script src="https://amoracoin.vercel.app/Src/Amoracoin%20lib/1.0.js"></script>
   <script>
     // Variáveis globais
-    let wallet = null;
+    let wallet = {
+      address: null,
+      privateKey: null,
+      balance: 0
+    };
+    
     let miningActive = false;
     let miningTimerId = null;
     let miningCount = 0;
-    let miningStats = {
-      attempts: 0,
-      successes: 0,
-      totalMined: 0,
-      dailyStats: {}
-    };
     
-    // Funções utilitárias
     function setCookie(name, value, days) {
       let expires = "";
-      if(days) {
+      if (days) {
         const date = new Date();
-        date.setTime(date.getTime() + (days*24*60*60*1000));
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
         expires = "; expires=" + date.toUTCString();
       }
-      document.cookie = name + "=" + (value || "") + expires + "; path=/";
+      document.cookie = name + "=" + value + expires + "; path=/";
     }
     
     function getCookie(name) {
       const nameEQ = name + "=";
       const ca = document.cookie.split(';');
-      for(let i = 0; i < ca.length; i++){
-        let c = ca[i].trim();
-        if(c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length);
+      for(let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) === ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) === 0) return c.substring(nameEQ.length, c.length);
       }
       return null;
     }
-
-    function shadeColor(color, percent) {
-      const f = parseInt(color.slice(1),16),
-            t = percent < 0 ? 0 : 255,
-            p = percent < 0 ? percent * -1 : percent,
-            R = f >> 16,
-            G = f >> 8 & 0x00FF,
-            B = f & 0x0000FF;
-      const newR = Math.round((t-R)*p/100)+R;
-      const newG = Math.round((t-G)*p/100)+G;
-      const newB = Math.round((t-B)*p/100)+B;
-      return "#" + (0x1000000+(newR)*0x10000+(newG)*0x100+(newB)).toString(16).slice(1);
+    
+    function deleteCookie(name) {
+      document.cookie = name + '=; Max-Age=-99999999;';
     }
     
-    // Funções de navegação
-    function showPage(pageId) {
-      document.querySelectorAll(".page").forEach(page => {
-        page.classList.remove("active");
-      });
-      document.getElementById(pageId).classList.add("active");
-      document.getElementById("sidebar").classList.remove("open");
+    function shadeColor(color, percent) {
+      let R = parseInt(color.substring(1,3), 16);
+      let G = parseInt(color.substring(3,5), 16);
+      let B = parseInt(color.substring(5,7), 16);
+      
+      R = parseInt(R * (100 + percent) / 100);
+      G = parseInt(G * (100 + percent) / 100);
+      B = parseInt(B * (100 + percent) / 100);
+      
+      R = (R < 255) ? R : 255;
+      G = (G < 255) ? G : 255;
+      B = (B < 255) ? B : 255;
+      
+      const RR = ((R.toString(16).length < 2) ? "0" : "") + R.toString(16);
+      const GG = ((G.toString(16).length < 2) ? "0" : "") + G.toString(16);
+      const BB = ((B.toString(16).length < 2) ? "0" : "") + B.toString(16);
+      
+      return "#" + RR + GG + BB;
+    }
+    
+    // Aplicar tema e configurações
+    function applyTheme() {
+      const primary = getCookie("primaryColor") || "#080f28";
+      const accent = getCookie("accentColor") || "#03a9f4";
+      const text = getCookie("textColor") || "#FFFFFF";
+      
+      document.documentElement.style.setProperty("--bg-primary", primary);
+      document.documentElement.style.setProperty("--accent", accent);
+      document.documentElement.style.setProperty("--accent-hover", shadeColor(accent, -10));
+      document.documentElement.style.setProperty("--accent-light", accent + "1A");
+      document.documentElement.style.setProperty("--text-color", text);
+      
+      // Aplicar outras configurações
+      applyPerformanceMode();
+      applyWallpaper();
+    }
+    
+    function applyPerformanceMode() {
+      const performanceMode = getCookie("performanceMode") === "true";
+      const enableAnimations = getCookie("enableAnimations") !== "false";
+      
+      if(performanceMode) {
+        document.getElementById("backgroundShapes").style.display = "none";
+        document.documentElement.style.setProperty("--container-backdrop", "none");
+        document.body.classList.add("performance-mode");
+      } else {
+        document.getElementById("backgroundShapes").style.display = "";
+        document.documentElement.style.setProperty("--container-backdrop", "blur(10px)");
+        document.body.classList.remove("performance-mode");
+      }
+      
+      if(!enableAnimations) {
+        document.body.classList.add("no-animations");
+      } else {
+        document.body.classList.remove("no-animations");
+      }
+    }
+    
+    function applyWallpaper() {
+      const wallpaperData = getCookie("wallpaper");
+      const blurValue = getCookie("wallpaperBlur") || "0";
+      
+      if(wallpaperData) {
+        document.getElementById("backgroundWallpaper").style.backgroundImage = `url(${wallpaperData})`;
+        document.getElementById("backgroundWallpaper").style.filter = `blur(${blurValue}px)`;
+        document.getElementById("backgroundWallpaper").style.opacity = "0.2";
+      } else {
+        document.getElementById("backgroundWallpaper").style.backgroundImage = "";
+      }
     }
     
     // Funções de carteira
+    function loadWallet() {
+      const storedKey = localStorage.getItem("amoracoinPrivateKey");
+      
+      if(storedKey) {
+        try {
+          wallet.privateKey = storedKey;
+          const walletInfo = Amoracoin.FindWallet();
+          
+          if(walletInfo) {
+            wallet.address = walletInfo.address;
+            wallet.balance = walletInfo.balance;
+            displayWallet(wallet);
+            document.getElementById("createWalletBtn").style.display = "none";
+            document.getElementById("deleteWalletBtn").style.display = "block";
+          } else {
+            clearWallet();
+          }
+        } catch(e) {
+          console.error("Erro ao carregar carteira:", e);
+          clearWallet();
+        }
+      } else {
+        clearWallet();
+      }
+    }
+    
+    function displayWallet(walletInfo) {
+      const walletDisplay = document.getElementById("walletDisplay");
+      
+      if(walletInfo.address) {
+        walletDisplay.innerHTML = `
+          <div class="wallet-info">
+            <div class="wallet-balance">
+              <span class="balance-value">${walletInfo.balance}</span>
+              <span class="balance-currency">amcr</span>
+            </div>
+            <div class="wallet-address">
+              <div class="address-label">Endereço da Carteira:</div>
+              <div class="address-value">${walletInfo.address}</div>
+            </div>
+            <div class="wallet-qr">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${walletInfo.address}" alt="QR Code da carteira">
+            </div>
+          </div>
+        `;
+      } else {
+        walletDisplay.innerHTML = `
+          <div class="wallet-empty">
+            <div class="empty-icon"><i class="fas fa-wallet"></i></div>
+            <p>Você ainda não tem uma carteira</p>
+            <p class="empty-subtitle">Clique no botão abaixo para criar uma nova carteira</p>
+          </div>
+        `;
+      }
+    }
+    
     function createNewWallet() {
       try {
-        wallet = Amoracoin.CreateWallet();
-        if(wallet) {
+        const newWallet = Amoracoin.CreateWallet();
+        if(newWallet) {
+          wallet.privateKey = newWallet.privateKey;
+          wallet.address = newWallet.address;
+          wallet.balance = 0;
+          
+          localStorage.setItem("amoracoinPrivateKey", newWallet.privateKey);
           displayWallet(wallet);
           document.getElementById("createWalletBtn").style.display = "none";
           document.getElementById("deleteWalletBtn").style.display = "block";
+          
           showNotification("Carteira criada com sucesso!", "success");
         } else {
           throw new Error("Falha ao criar carteira");
@@ -1120,208 +1228,459 @@
       }
     }
     
-    function displayWallet(wallet) {
-      const walletDisplay = document.getElementById('walletDisplay');
-      walletDisplay.innerHTML = `
-        <div class="wallet-info">
-          <div class="wallet-balance">
-            <span class="balance-value">${wallet.balance}</span> <span class="balance-currency">amcr</span>
-          </div>
-          <div class="wallet-address-container">
-            <div class="address-label">Endereço da Carteira</div>
-            <div class="wallet-address">${wallet.address}</div>
-            <button class="copy-btn" onclick="copyToClipboard('${wallet.address}')">
-              <i class="fas fa-copy"></i>
-            </button>
-          </div>
-          <div class="wallet-details">
-            <div class="detail-row">
-              <span class="detail-label">Chave Privada:</span>
-              <div class="private-key-container">
-                <span id="privateKeyValue" class="private-key-masked">••••••••••••••••••••</span>
-                <button class="toggle-btn" id="togglePrivateKeyBtn">
-                  <i class="fas fa-eye"></i>
-                </button>
-                <input type="hidden" id="privateKeyHidden" value="${wallet.privateKey}">
-              </div>
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">Criada em:</span>
-              <span class="detail-value">${new Date(wallet.created_at).toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      `;
-      
-      // Configurar botão de toggle para chave privada
-      document.getElementById("togglePrivateKeyBtn").addEventListener("click", function() {
-        const keyElement = document.getElementById("privateKeyValue");
-        const hiddenKey = document.getElementById("privateKeyHidden").value;
-        
-        if(keyElement.classList.contains("private-key-masked")) {
-          keyElement.textContent = hiddenKey;
-          keyElement.classList.remove("private-key-masked");
-          this.innerHTML = '<i class="fas fa-eye-slash"></i>';
-        } else {
-          keyElement.textContent = "••••••••••••••••••••";
-          keyElement.classList.add("private-key-masked");
-          this.innerHTML = '<i class="fas fa-eye"></i>';
-        }
-      });
-    }
-    
     function clearWallet() {
-      try {
-        const result = Amoracoin.DeleteWallet(wallet.privateKey);
-        if(result === true) {
-          wallet = null;
-          document.getElementById("walletDisplay").innerHTML = '<p class="text-center">Nenhuma carteira encontrada.</p>';
-          document.getElementById("createWalletBtn").style.display = "block";
-          document.getElementById("deleteWalletBtn").style.display = "none";
-          return true;
-        } else {
-          showNotification("Erro ao excluir carteira: " + result, "error");
-          return false;
-        }
-      } catch(e) {
-        console.error("Erro ao excluir carteira:", e);
-        showNotification("Erro ao excluir carteira: " + e.message, "error");
-        return false;
-      }
+      wallet = {
+        address: null,
+        privateKey: null,
+        balance: 0
+      };
+      
+      localStorage.removeItem("amoracoinPrivateKey");
+      
+      displayWallet(wallet);
+      document.getElementById("createWalletBtn").style.display = "block";
+      document.getElementById("deleteWalletBtn").style.display = "none";
     }
     
     function refreshWalletBalance() {
-      if(!wallet) return;
-      
-      try {
-        // Usamos FindWallet que busca a carteira pelo localStorage
-        const updatedWallet = Amoracoin.FindWallet();
-        if(updatedWallet) {
-          wallet = updatedWallet;
-          document.querySelector(".balance-value").textContent = wallet.balance;
-          return true;
+      if(wallet.privateKey) {
+        try {
+          const walletInfo = Amoracoin.FindWallet();
+          if(walletInfo) {
+            wallet.balance = walletInfo.balance;
+            displayWallet(wallet);
+          }
+        } catch(e) {
+          console.error("Erro ao atualizar saldo:", e);
         }
-        return false;
-      } catch(e) {
-        console.error("Erro ao atualizar saldo:", e);
-        return false;
       }
     }
     
-    // Funções para transferir
-    function transferCoins() {
-      const destination = document.getElementById("destination").value.trim();
-      const amount = parseFloat(document.getElementById("amount").value);
-      const output = document.getElementById("transferOutput");
+    // Função para mostrar notificações
+    function showNotification(message, type = "info") {
+      const notification = document.createElement("div");
+      notification.className = `notification ${type}`;
+      notification.innerHTML = `
+        <div class="notification-content">
+          <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+          <span>${message}</span>
+        </div>
+        <button class="notification-close"><i class="fas fa-times"></i></button>
+      `;
       
-      output.style.display = "block";
-      output.innerHTML = "<p>Processando transferência...</p>";
+      document.body.appendChild(notification);
       
-      if(!wallet) {
-        output.innerHTML = "<p class='error'>Você precisa ter uma carteira para fazer transferências</p>";
-        return;
+      // Mostrar a notificação com animação
+      setTimeout(() => {
+        notification.classList.add("show");
+      }, 10);
+      
+      // Auto-remover após 5 segundos
+      const timeout = setTimeout(() => {
+        notification.classList.remove("show");
+        setTimeout(() => notification.remove(), 300);
+      }, 5000);
+      
+      // Botão de fechar
+      notification.querySelector(".notification-close").addEventListener("click", () => {
+        clearTimeout(timeout);
+        notification.classList.remove("show");
+        setTimeout(() => notification.remove(), 300);
+      });
+    }
+    
+    // Gerenciamento de páginas
+    function switchPage(pageId) {
+      // Esconder todas as páginas
+      document.querySelectorAll(".page").forEach(page => {
+        page.classList.remove("active");
+      });
+      
+      // Desmarcar todos os links
+      document.querySelectorAll(".nav-list a").forEach(link => {
+        link.classList.remove("active");
+      });
+      
+      // Ativar a página solicitada
+      document.getElementById(pageId).classList.add("active");
+      
+      // Marcar o link correspondente como ativo
+      document.querySelector(`.nav-list a[data-page="${pageId}"]`)?.classList.add("active");
+      
+      // Fechar o sidebar em celular
+      if(window.innerWidth <= 768) {
+        document.getElementById("sidebar").classList.remove("active");
       }
+    }
+    
+    // Inicialização
+    document.addEventListener("DOMContentLoaded", function() {
+      applyTheme();
+      loadWallet();
       
-      if(!destination) {
-        output.innerHTML = "<p class='error'>Informe o endereço de destino</p>";
-        return;
-      }
+      // Navegação no sidebar
+      document.querySelectorAll(".nav-list a[data-page]").forEach(link => {
+        link.addEventListener("click", function(e) {
+          e.preventDefault();
+          const pageId = this.dataset.page;
+          switchPage(pageId);
+        });
+      });
       
-      if(isNaN(amount) || amount <= 0) {
-        output.innerHTML = "<p class='error'>Informe um valor válido</p>";
-        return;
-      }
+      // Controle do sidebar
+      document.getElementById("menuToggle").addEventListener("click", function() {
+        document.getElementById("sidebar").classList.add("active");
+      });
       
-      try {
-        const result = Amoracoin.Transfer(wallet.privateKey, destination, amount);
+      document.getElementById("sidebarClose").addEventListener("click", function() {
+        document.getElementById("sidebar").classList.remove("active");
+      });
+      
+      // Configurações
+      document.getElementById("settingsIcon").addEventListener("click", function() {
+        document.getElementById("modalOverlay").style.display = "flex";
+      });
+      
+      document.getElementById("settingsSidebarLink").addEventListener("click", function(e) {
+        e.preventDefault();
+        document.getElementById("modalOverlay").style.display = "flex";
+        document.getElementById("sidebar").classList.remove("active");
+      });
+      
+      document.getElementById("closeSettingsModal").addEventListener("click", function() {
+        document.getElementById("modalOverlay").style.display = "none";
+      });
+      
+      document.getElementById("modalOverlay").addEventListener("click", function(e) {
+        if(e.target === this) {
+          this.style.display = "none";
+        }
+      });
+      
+      // Controles de abas
+      document.querySelectorAll(".tab-btn").forEach(btn => {
+        btn.addEventListener("click", function() {
+          const tabId = this.dataset.tab;
+          
+          // Desativar todas as abas e conteúdos
+          document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
+          
+          // Ativar a aba clicada
+          this.classList.add("active");
+          document.getElementById(tabId).style.display = "block";
+        });
+      });
+      
+      // Botões da carteira
+      document.getElementById("createWalletBtn").addEventListener("click", createNewWallet);
+      document.getElementById("deleteWalletBtn").addEventListener("click", function() {
+        if(confirm("Tem certeza que deseja excluir sua carteira? Esta ação não pode ser desfeita.")) {
+          clearWallet();
+          showNotification("Carteira excluída com sucesso", "info");
+        }
+      });
+      document.getElementById("refreshWalletBtn").addEventListener("click", refreshWalletBalance);
+      
+      // Transferência
+      document.getElementById("transferBtn").addEventListener("click", function() {
+        const destination = document.getElementById("destination").value.trim();
+        const amount = parseFloat(document.getElementById("amount").value);
+        const output = document.getElementById("transferOutput");
         
-        if(result.success) {
-          output.innerHTML = `
-            <p class='success'>Transferência realizada com sucesso!</p>
-            <p>Valor: ${amount} amcr</p>
-            <p>Destinatário: ${destination}</p>
-          `;
-          refreshWalletBalance();
-          showNotification("Transferência realizada com sucesso!", "success");
-        } else {
-          output.innerHTML = `<p class='error'>Erro na transferência: ${result.message || "Erro desconhecido"}</p>`;
+        output.style.display = "block";
+        output.innerHTML = "<p>Processando transferência...</p>";
+        
+        if(!wallet.privateKey) {
+          output.innerHTML = "<p class='error'>Você precisa ter uma carteira para fazer transferências</p>";
+          return;
         }
-      } catch(e) {
-        output.innerHTML = `<p class='error'>Erro: ${e.message}</p>`;
-        console.error("Erro na transferência:", e);
-      }
-    }
+        
+        if(!destination) {
+          output.innerHTML = "<p class='error'>Informe o endereço de destino</p>";
+          return;
+        }
+        
+        if(isNaN(amount) || amount <= 0) {
+          output.innerHTML = "<p class='error'>Informe um valor válido</p>";
+          return;
+        }
+        
+        try {
+          const result = Amoracoin.Transfer(wallet.privateKey, destination, amount);
+          
+          if(result.success) {
+            output.innerHTML = `
+              <p class='success'>Transferência realizada com sucesso!</p>
+              <p>Valor: ${amount} amcr</p>
+              <p>Destinatário: ${destination}</p>
+            `;
+            refreshWalletBalance();
+            showNotification("Transferência realizada com sucesso!", "success");
+          } else {
+            output.innerHTML = `<p class='error'>Erro na transferência: ${result.message || "Erro desconhecido"}</p>`;
+          }
+        } catch(e) {
+          output.innerHTML = `<p class='error'>Erro: ${e.message}</p>`;
+          console.error("Erro na transferência:", e);
+        }
+      });
+      
+      // Mineração
+      document.getElementById("mineBtn").addEventListener("click", function() {
+        if(!wallet.privateKey) {
+          showNotification("Você precisa ter uma carteira para minerar", "error");
+          return;
+        }
+        
+        const delay = parseInt(document.getElementById("mineDelay").value) || 500;
+        const count = parseInt(document.getElementById("mineCount").value) || 1;
+        
+        if(delay < 50) {
+          showNotification("O intervalo mínimo é de 50ms para prevenir sobrecarga", "warning");
+          document.getElementById("mineDelay").value = 50;
+          return;
+        }
+        
+        miningActive = true;
+        miningCount = 0;
+        document.getElementById("mineBtn").style.display = "none";
+        document.getElementById("stopMineBtn").style.display = "block";
+        document.getElementById("mineOutput").innerHTML = "<div>Iniciando mineração...</div>";
+        
+        // Iniciar loop de mineração
+        mineLoop(count, delay);
+      });
+      
+      document.getElementById("stopMineBtn").addEventListener("click", function() {
+        miningActive = false;
+        if(miningTimerId) clearTimeout(miningTimerId);
+        
+        document.getElementById("stopMineBtn").style.display = "none";
+        document.getElementById("mineBtn").style.display = "block";
+        document.getElementById("mineOutput").innerHTML = `<div>Mineração interrompida após ${miningCount} tentativas</div>` + document.getElementById("mineOutput").innerHTML;
+      });
+      
+      // Histórico de transações
+      document.getElementById("transactionsBtn").addEventListener("click", function() {
+        if(!wallet.address) {
+          document.getElementById("transactionsOutput").innerHTML = "<p>Você precisa ter uma carteira para ver transações</p>";
+          return;
+        }
+        
+        try {
+          const transactions = Amoracoin.Transactions();
+          const transactionsOutput = document.getElementById("transactionsOutput");
+          
+          if(!transactions || transactions.length === 0) {
+            transactionsOutput.innerHTML = "<p>Nenhuma transação encontrada</p>";
+            return;
+          }
+          
+          // Filtrar transações relacionadas à carteira atual
+          const myTransactions = transactions.filter(tx => 
+            tx.from === wallet.address || tx.to === wallet.address
+          );
+          
+          if(myTransactions.length === 0) {
+            transactionsOutput.innerHTML = "<p>Você ainda não possui transações</p>";
+            return;
+          }
+          
+          // Ordenar por data (mais recentes primeiro)
+          myTransactions.sort((a, b) => b.timestamp - a.timestamp);
+          
+          let html = "";
+          
+          myTransactions.forEach(tx => {
+            const isSent = tx.from === wallet.address;
+            const date = new Date(tx.timestamp).toLocaleString();
+            const icon = isSent ? "fa-arrow-up" : "fa-arrow-down";
+            const typeLabel = isSent ? "Enviado" : "Recebido";
+            const otherParty = isSent ? tx.to : tx.from;
+            
+            html += `
+              <div class="transaction-item ${isSent ? 'sent' : 'received'}">
+                <div class="transaction-icon">
+                  <i class="fas ${icon}"></i>
+                </div>
+                <div class="transaction-details">
+                  <div class="transaction-type">${typeLabel}</div>
+                  <div class="transaction-amount">${tx.amount} amcr</div>
+                  <div class="transaction-date">${date}</div>
+                  <div class="transaction-address">
+                    <span>${isSent ? 'Para' : 'De'}:</span>
+                    <span class="address-text" title="${otherParty}">${otherParty.substring(0, 15)}...${otherParty.substring(otherParty.length-4)}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          });
+          
+          transactionsOutput.innerHTML = html;
+          
+        } catch(e) {
+          console.error("Erro ao carregar transações:", e);
+          document.getElementById("transactionsOutput").innerHTML = `<p class='error'>Erro ao carregar transações: ${e.message}</p>`;
+        }
+      });
+      
+      // Total e taxa
+      document.getElementById("totalBtn").addEventListener("click", function() {
+        try {
+          const total = Amoracoin.TotalAmoracoins();
+          document.getElementById("totalOutput").innerText = total + " amcr";
+        } catch(e) {
+          console.error("Erro ao consultar total:", e);
+          document.getElementById("totalOutput").innerText = "Erro ao consultar total";
+        }
+      });
+      
+      document.getElementById("feeBtn").addEventListener("click", function() {
+        try {
+          const fee = Amoracoin.fee();
+          document.getElementById("feeOutput").innerText = fee + " amcr";
+        } catch(e) {
+          console.error("Erro ao consultar taxa:", e);
+          document.getElementById("feeOutput").innerText = "Erro ao consultar taxa";
+        }
+      });
+      
+      // Análise
+      document.getElementById("analyzeBtn").addEventListener("click", function() {
+        try {
+          const analyze = Amoracoin.Wallet();
+          document.getElementById("analyzeOutput").style.display = "block";
+          document.getElementById("analyzeOutput").innerHTML = "<pre>" + JSON.stringify(analyze, null, 2) + "</pre>";
+        } catch(e) {
+          console.error("Erro ao analisar carteiras:", e);
+          document.getElementById("analyzeOutput").innerHTML = `<p class='error'>Erro: ${e.message}</p>`;
+        }
+      });
+      
+      // Configurações - salvar cores
+      document.getElementById("saveSettingsBtn").addEventListener("click", function() {
+        const primaryColor = document.getElementById("primaryColor").value;
+        const accentColor = document.getElementById("accentColor").value;
+        const textColor = document.getElementById("textColor").value;
+        const enableAnimations = document.getElementById("enableAnimations").checked;
+        const performanceMode = document.getElementById("performanceMode").checked;
+        
+        setCookie("primaryColor", primaryColor, 365);
+        setCookie("accentColor", accentColor, 365);
+        setCookie("textColor", textColor, 365);
+        setCookie("enableAnimations", enableAnimations, 365);
+        setCookie("performanceMode", performanceMode, 365);
+        
+        applyTheme();
+        document.getElementById("modalOverlay").style.display = "none";
+        showNotification("Configurações salvas com sucesso!", "success");
+      });
+      
+      // Temas
+      document.getElementById("applyThemeBtn").addEventListener("click", function() {
+        const activeTheme = document.querySelector(".theme-preview.active");
+        if(activeTheme) {
+          const theme = activeTheme.dataset.theme;
+          
+          switch(theme) {
+            case "default":
+              setCookie("primaryColor", "#080f28", 365);
+              setCookie("accentColor", "#03a9f4", 365);
+              setCookie("textColor", "#ffffff", 365);
+              break;
+            case "dark":
+              setCookie("primaryColor", "#0d0d0d", 365);
+              setCookie("accentColor", "#03a9f4", 365);
+              setCookie("textColor", "#ffffff", 365);
+              break;
+            case "ocean":
+              setCookie("primaryColor", "#1a2980", 365);
+              setCookie("accentColor", "#26d0ce", 365);
+              setCookie("textColor", "#ffffff", 365);
+              break;
+            case "royal":
+              setCookie("primaryColor", "#4a00e0", 365);
+              setCookie("accentColor", "#8e2de2", 365);
+              setCookie("textColor", "#ffffff", 365);
+              break;
+            case "sunset":
+              setCookie("primaryColor", "#ff416c", 365);
+              setCookie("accentColor", "#ff4b2b", 365);
+              setCookie("textColor", "#ffffff", 365);
+              break;
+          }
+          
+          applyTheme();
+          document.getElementById("modalOverlay").style.display = "none";
+          showNotification("Tema aplicado com sucesso!", "success");
+        }
+      });
+      
+      document.querySelectorAll(".theme-preview").forEach(themePreview => {
+        themePreview.addEventListener("click", function() {
+          document.querySelectorAll(".theme-preview").forEach(t => t.classList.remove("active"));
+          this.classList.add("active");
+        });
+      });
+      
+      // Personalização do wallpaper
+      document.getElementById("wallpaperInput").addEventListener("change", function(e) {
+        const file = e.target.files[0];
+        if(file) {
+          const reader = new FileReader();
+          reader.onload = function(event) {
+            setCookie("wallpaper", event.target.result, 365);
+            applyWallpaper();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      
+      document.getElementById("blurSlider").addEventListener("input", function() {
+        setCookie("wallpaperBlur", this.value, 365);
+        applyWallpaper();
+      });
+      
+      document.getElementById("resetDefaultBtn").addEventListener("click", function() {
+        if(confirm("Tem certeza que deseja restaurar as configurações padrão?")) {
+          deleteCookie("primaryColor");
+          deleteCookie("accentColor");
+          deleteCookie("textColor");
+          deleteCookie("wallpaper");
+          deleteCookie("wallpaperBlur");
+          deleteCookie("enableAnimations");
+          deleteCookie("performanceMode");
+          
+          document.getElementById("primaryColor").value = "#080f28";
+          document.getElementById("accentColor").value = "#03a9f4";
+          document.getElementById("textColor").value = "#ffffff";
+          document.getElementById("blurSlider").value = 0;
+          document.getElementById("enableAnimations").checked = true;
+          document.getElementById("performanceMode").checked = false;
+          
+          applyTheme();
+          showNotification("Configurações padrão restauradas", "success");
+        }
+      });
+    });
     
-    // Funções para mineração
-    function startMining() {
-      if(!wallet || miningActive) return;
-      
-      const delay = parseInt(document.getElementById("mineDelay").value) || 500;
-      const count = parseInt(document.getElementById("mineCount").value) || 1;
-      
-      if(delay < 50) {
-        showNotification("O intervalo mínimo é de 50ms para prevenir sobrecarga", "warning");
-        document.getElementById("mineDelay").value = 50;
-        return;
-      }
-      
-      miningActive = true;
-      miningCount = 0;
-      document.getElementById("mineBtn").style.display = "none";
-      document.getElementById("stopMineBtn").style.display = "block";
-      document.getElementById("mineOutput").innerHTML = "<div>Iniciando mineração...</div>";
-      
-      // Iniciar loop de mineração
-      mineLoop(count, delay);
-    }
-    
-    function stopMining() {
-      miningActive = false;
-      if(miningTimerId) clearTimeout(miningTimerId);
-      
-      document.getElementById("stopMineBtn").style.display = "none";
-      document.getElementById("mineBtn").style.display = "block";
-      document.getElementById("mineOutput").innerHTML = `<div>Mineração interrompida após ${miningCount} tentativas</div>` + document.getElementById("mineOutput").innerHTML;
-    }
-    
+    // Função para mineração contínua
     function mineLoop(remaining, delay) {
       if(!miningActive) return;
       
       try {
-        miningCount++;
         const result = Amoracoin.Mine(wallet.privateKey);
-        miningStats.attempts++;
+        miningCount++;
         
         const timestamp = new Date().toLocaleTimeString();
-        const today = new Date().toISOString().split('T')[0];
         let message = "";
         
-        if(!miningStats.dailyStats[today]) {
-          miningStats.dailyStats[today] = {
-            attempts: 0,
-            successes: 0,
-            amountMined: 0
-          };
-        }
-        
-        miningStats.dailyStats[today].attempts++;
-        
         if(result.success) {
-          const reward = 1; // Assumimos 1 como padrão se não houver informação específica
-          message = `<div class="mine-success">[${timestamp}] Bloco minerado com sucesso! +${reward} amcr</div>`;
-          
-          // Atualizar estatísticas
-          miningStats.successes++;
-          miningStats.totalMined += reward;
-          miningStats.dailyStats[today].successes++;
-          miningStats.dailyStats[today].amountMined += reward;
-          
-          // Salvar estatísticas
-          localStorage.setItem('mining_stats', JSON.stringify(miningStats));
-          
+          message = `<div class="mine-success">[${timestamp}] Bloco minerado com sucesso! +${result.reward} amcr</div>`;
           refreshWalletBalance();
         } else {
-          message = `<div class="mine-fail">[${timestamp}] Tentativa ${miningCount} falhou: ${result.message || "Sem sucesso"}</div>`;
+          message = `<div class="mine-fail">[${timestamp}] Tentativa ${miningCount} falhou</div>`;
         }
         
         const mineOutput = document.getElementById("mineOutput");
@@ -1356,242 +1715,12 @@
       }
     }
     
-    // Funções para visualizar transações
-    function loadTransactions() {
-      if(!wallet) {
-        document.getElementById("transactionsOutput").innerHTML = "<p>Você precisa ter uma carteira para ver transações</p>";
-        return;
+    // Atualização automática do saldo
+    setInterval(() => {
+      if(!document.hidden && wallet.privateKey) {
+        refreshWalletBalance();
       }
-      
-      try {
-        const transactions = Amoracoin.Transactions();
-        const transactionsOutput = document.getElementById("transactionsOutput");
-        
-        if(!transactions || transactions.length === 0) {
-          transactionsOutput.innerHTML = "<p>Nenhuma transação encontrada</p>";
-          return;
-        }
-        
-        // Filtrar transações relacionadas à carteira atual
-        const myTransactions = transactions.filter(tx => 
-          tx.from === wallet.address || tx.to === wallet.address
-        );
-        
-        if(myTransactions.length === 0) {
-          transactionsOutput.innerHTML = "<p>Você ainda não possui transações</p>";
-          return;
-        }
-        
-        // Ordenar por data (mais recentes primeiro)
-        myTransactions.sort((a, b) => b.timestamp - a.timestamp);
-        
-        let html = "";
-        
-        myTransactions.forEach(tx => {
-          const isSent = tx.from === wallet.address;
-          const date = new Date(tx.timestamp).toLocaleString();
-          const icon = isSent ? "fa-arrow-up" : "fa-arrow-down";
-          const typeLabel = isSent ? "Enviado" : "Recebido";
-          const otherParty = isSent ? tx.to : tx.from;
-          
-          html += `
-            <div class="transaction-item ${isSent ? 'sent' : 'received'}">
-              <div class="transaction-icon">
-                <i class="fas ${icon}"></i>
-              </div>
-              <div class="transaction-details">
-                <div class="transaction-type">${typeLabel}</div>
-                <div class="transaction-amount">${tx.amount} amcr</div>
-                <div class="transaction-date">${date}</div>
-                <div class="transaction-address">
-                  <span>${isSent ? 'Para' : 'De'}:</span>
-                  <span class="address-text" title="${otherParty}">${otherParty.substring(0, 15)}...${otherParty.substring(otherParty.length-4)}</span>
-                </div>
-              </div>
-            </div>
-          `;
-        });
-        
-        transactionsOutput.innerHTML = html;
-        
-      } catch(e) {
-        console.error("Erro ao carregar transações:", e);
-        document.getElementById("transactionsOutput").innerHTML = `<p class='error'>Erro ao carregar transações: ${e.message}</p>`;
-      }
-    }
-    
-    // Funções para consultas
-    function loadTotalCoins() {
-      try {
-        const total = Amoracoin.TotalAmoracoins();
-        document.getElementById("totalOutput").innerText = total + " amcr";
-      } catch(e) {
-        console.error("Erro ao consultar total:", e);
-        document.getElementById("totalOutput").innerText = "Erro ao consultar total";
-      }
-    }
-    
-    function loadFee() {
-      try {
-        const fee = Amoracoin.fee();
-        document.getElementById("feeOutput").innerText = fee + " amcr";
-      } catch(e) {
-        console.error("Erro ao consultar taxa:", e);
-        document.getElementById("feeOutput").innerText = "Erro ao consultar taxa";
-      }
-    }
-    
-    function analyzeWallets() {
-      try {
-        const analyze = Amoracoin.Wallet();
-        document.getElementById("analyzeOutput").style.display = "block";
-        document.getElementById("analyzeOutput").innerHTML = "<pre>" + JSON.stringify(analyze, null, 2) + "</pre>";
-      } catch(e) {
-        console.error("Erro ao analisar carteiras:", e);
-        document.getElementById("analyzeOutput").innerHTML = `<p class='error'>Erro: ${e.message}</p>`;
-      }
-    }
-    
-    // Função para mostrar notificações
-    function showNotification(message, type = 'info') {
-      const notification = document.createElement('div');
-      notification.className = `notification ${type}`;
-      notification.innerHTML = message;
-      
-      document.body.appendChild(notification);
-      
-      setTimeout(() => {
-        notification.classList.add('show');
-      }, 10);
-      
-      setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => {
-          notification.remove();
-        }, 300);
-      }, 3000);
-    }
-    
-    // Função para copiar para área de transferência
-    function copyToClipboard(text) {
-      const el = document.createElement('textarea');
-      el.value = text;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-      
-      showNotification('Copiado para a área de transferência!', 'success');
-    }
-    
-    // Inicialização
-    document.addEventListener('DOMContentLoaded', function() {
-      // Aplicar tema
-      applyTheme();
-      
-      // Carregar carteira se existir
-      wallet = Amoracoin.FindWallet();
-      if(wallet) {
-        displayWallet(wallet);
-        document.getElementById("createWalletBtn").style.display = "none";
-        document.getElementById("deleteWalletBtn").style.display = "block";
-      }
-      
-      // Navegação e menu lateral
-      document.getElementById("menuToggle").addEventListener("click", function() {
-        document.getElementById("sidebar").classList.toggle("open");
-      });
-      
-      document.getElementById("sidebarClose").addEventListener("click", function() {
-        document.getElementById("sidebar").classList.remove("open");
-      });
-      
-      document.querySelectorAll(".nav-list a").forEach(function(link) {
-        link.addEventListener("click", function(e) {
-          e.preventDefault();
-          showPage(this.getAttribute("data-page"));
-        });
-      });
-      
-      // Botão de configurações
-      document.getElementById("settingsIcon").addEventListener("click", function() {
-        document.getElementById("modalOverlay").style.display = "flex";
-      });
-      
-      document.getElementById("settingsSidebarLink").addEventListener("click", function(e) {
-        e.preventDefault();
-        document.getElementById("modalOverlay").style.display = "flex";
-      });
-      
-      document.getElementById("closeSettingsModal").addEventListener("click", function() {
-        document.getElementById("modalOverlay").style.display = "none";
-      });
-      
-      // Botões de ação
-      document.getElementById("createWalletBtn").addEventListener("click", createNewWallet);
-      document.getElementById("deleteWalletBtn").addEventListener("click", function() {
-        if(confirm("Tem certeza que deseja excluir sua carteira? Esta ação não pode ser desfeita.")) {
-          clearWallet();
-        }
-      });
-      document.getElementById("refreshWalletBtn").addEventListener("click", refreshWalletBalance);
-      document.getElementById("transferBtn").addEventListener("click", transferCoins);
-      document.getElementById("mineBtn").addEventListener("click", startMining);
-      document.getElementById("stopMineBtn").addEventListener("click", stopMining);
-      document.getElementById("transactionsBtn").addEventListener("click", loadTransactions);
-      document.getElementById("totalBtn").addEventListener("click", loadTotalCoins);
-      document.getElementById("feeBtn").addEventListener("click", loadFee);
-      document.getElementById("analyzeBtn").addEventListener("click", analyzeWallets);
-      
-      // Configurações
-      document.querySelectorAll(".tab-btn").forEach(function(tab) {
-        tab.addEventListener("click", function() {
-          const tabId = this.dataset.tab;
-          
-          document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-          document.querySelectorAll(".tab-content").forEach(c => c.style.display = "none");
-          
-          this.classList.add("active");
-          document.getElementById(tabId).style.display = "block";
-        });
-      });
-      
-      // Atualização do saldo periódica
-      setInterval(() => {
-        if(!document.hidden && wallet) {
-          refreshWalletBalance();
-        }
-      }, 30000);
-    });
-    
-    function applyTheme() {
-      const primary = getCookie("primaryColor") || "#080f28";
-      const accent = getCookie("accentColor") || "#03a9f4";
-      const text = getCookie("textColor") || "#FFFFFF";
-      const performanceMode = getCookie("performanceMode") === "true";
-      const enableAnimations = getCookie("enableAnimations") !== "false";
-      
-      document.documentElement.style.setProperty("--bg-primary", primary);
-      document.documentElement.style.setProperty("--accent", accent);
-      document.documentElement.style.setProperty("--accent-hover", shadeColor(accent, 20));
-      document.documentElement.style.setProperty("--text-color", text);
-      
-      if(performanceMode) {
-        document.getElementById("backgroundShapes").style.display = "none";
-        document.documentElement.style.setProperty("--container-backdrop", "none");
-        document.body.classList.add("performance-mode");
-      } else {
-        document.getElementById("backgroundShapes").style.display = "";
-        document.documentElement.style.setProperty("--container-backdrop", "blur(10px)");
-        document.body.classList.remove("performance-mode");
-      }
-      
-      if(!enableAnimations) {
-        document.body.classList.add("no-animations");
-      } else {
-        document.body.classList.remove("no-animations");
-      }
-    }
+    }, 30000);
   </script>
 </body>
 </html>
